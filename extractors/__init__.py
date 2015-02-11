@@ -18,7 +18,8 @@ from goose.text import StopWordsArabic
 from goose.text import StopWordsChinese
 from goose.text import StopWordsKorean
 import sys
-from bs4 import UnicodeDammit
+from bs4 import UnicodeDammit, BeautifulSoup
+from urlparse import urlparse
 
 
 class BaseExtractor(object):
@@ -37,14 +38,17 @@ class HTMLExtractor(BaseExtractor):
     Extracts
     """
     def extract(self, url):
+        if not urlparse(url).scheme:
+            url = "http://" + url
         resp = requests.get(url, timeout=50)
         if resp.status_code == 200:
             resp = self.contentFix(resp)
             msg = {
                 'encoding': resp.encoding,
                 'content': resp.text,
-                'headers': resp.headers,
-                'link': resp.url
+                'headers': dict(resp.headers),
+                'link': resp.url,
+                'metadata': self.get_metadata(resp.text)
             }
 
             return msg
@@ -61,6 +65,15 @@ class HTMLExtractor(BaseExtractor):
         except Exception, e:
             raise Exception('Error Fixing Content (%s): %s' % (str(e), resp.url))
 
+    def get_metadata(self, raw_html):
+        soup = BeautifulSoup(raw_html)
+        metadata = {}
+        for meta in soup.find_all('meta'):
+            if 'name' in meta.attrs:
+                metadata[meta['name']] = meta.attrs.get('content', '')
+
+        return metadata
+
 
 class GooseExtractor(HTMLExtractor):
     def __init__(self):
@@ -71,21 +84,32 @@ class GooseExtractor(HTMLExtractor):
         Code by Mike Ogren CACI Inc.,
         """
         if url:
-            resp = requests.get(url)
-            if resp.status_code == 200:
-                resp = self.contentFix(resp)
-                msg = {
-                    'encoding': resp.encoding,
-                    'headers': resp.headers,
-                    'link': resp.url
-                }
-                content_lang = self.guess_language(resp.text)
+            msg = super(GooseExtractor, self).extract(url)
+            if not 'error' in msg:
+                content_lang = self.guess_language(msg["content"])
                 if not content_lang:
                     content_lang = default_lang
                 msg['url_language'] = content_lang
-                raw_html = resp.text
+                raw_html = msg["content"]
             else:
-                return {'error': resp.status_code}
+                return msg
+            #resp = requests.get(url)
+            #if resp.status_code == 200:
+            #    resp = self.contentFix(resp)
+            #    msg = {
+            #        'encoding': resp.encoding,
+            #        'headers': dict(resp.headers),
+            #        'link': resp.url
+            #        'metadata': {},
+            #    }
+            #    content_lang = self.guess_language(resp.text)
+            #    msg['metadata'] =
+            #    if not content_lang:
+            #        content_lang = default_lang
+            #    msg['url_language'] = content_lang
+            #    raw_html = resp.text
+            #else:
+            #    return {'error': resp.status_code}
         elif raw_html:
             msg = {
                 'encoding': UnicodeDammit(raw_html).original_encoding,
@@ -135,7 +159,7 @@ class GooseExtractor(HTMLExtractor):
 
 
 class URLMiner(object):
-    def __init__(self, n_jobs=1, extract_content=None, **kwargs):
+    def __init__(self, n_jobs=-1, extract_content=None, **kwargs):
         """
         n_jobs: default is 1. if -1 is given then the number of processors is used
         extract_content : dump raw html by default, if True use goose
@@ -153,10 +177,11 @@ class URLMiner(object):
             urllist = [urllist]
             unwrap = True
 
-        url_content = Parallel(n_jobs=self.n_jobs)(delayed(urlextract)(((url[urltag] if urltag else url)), self.extractor) for url in urllist)
+        url_content = Parallel(n_jobs=self.n_jobs, backend='threading')(delayed(urlextract)(((url[urltag] if urltag else url)), self.extractor) for url in urllist)
         if urltag:
             for index, l in enumerate(url_content):
                 urllist[index][urlContentKey] = l
+            url_content = urllist
 
         if unwrap:
             url_content = url_content[0]
