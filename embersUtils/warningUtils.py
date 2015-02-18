@@ -111,7 +111,8 @@ class WarningParser(object):
         else:
             self.createCols = {'month': {'transformCol': 'eventDate', 'transformFn': lambda x: x[:7]},
                                'country': {'transformCol': 'location', 'transformFn': lambda x: x[0]},
-                               'model_short': {'transformCol': 'model', 'transformFn': self.get_model}}
+                               'model_short': {'transformCol': 'model', 'transformFn': self.get_model},
+                               'eventcode': {'transformCol': 'eventType', 'transformFn': lambda x: x[:3]}}
 
         if complex_fns:
             self.complex_fns = complex_fns
