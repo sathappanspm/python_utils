@@ -22,6 +22,28 @@ from bs4 import UnicodeDammit, BeautifulSoup
 from urlparse import urlparse
 
 
+def decode(s, encoding=None):
+    """
+    Decode given string into the given encoding.
+    If no encoding is specified, use 'utf-8'
+    params:
+        s - string to be decoded
+        encoding - encoding to be used. 'utf-8' if none specified
+    """
+    if not encoding:
+        encoding = 'utf-8'
+
+    try:
+        r_val = s.decode(encoding)
+    except:
+        if encoding != 'utf-8':
+            r_val = decode(s, 'utf-8')
+        else:
+            r_val = s
+
+    return r_val
+
+
 class BaseExtractor(object):
     """
     Template for Extractors
@@ -66,11 +88,29 @@ class HTMLExtractor(BaseExtractor):
             raise Exception('Error Fixing Content (%s): %s' % (str(e), resp.url))
 
     def get_metadata(self, raw_html):
+        """
+        Get Meta-data from given HTML text.
+        Split them based on the origin of meta (like - 'og', 'twitter', 'dc', etc.)
+        params-
+            raw_html: Raw HTML text
+
+        return:
+            metadata : Dict of form  {'features': {}, 'properties': {} }
+        """
         soup = BeautifulSoup(raw_html)
-        metadata = {}
+        metadata = {"features": {}, "properties": {}}
         for meta in soup.find_all('meta'):
-            if 'name' in meta.attrs:
-                metadata[meta['name']] = meta.attrs.get('content', '')
+            meta_type = 'name' if 'name' in meta.attrs else ('property' if 'property' in meta.attrs else "")
+            if meta_type:
+                metadata['features'][meta[meta_type]] = meta.attrs.get('content', '')
+
+                meta_propertyTitle = meta[meta_type]
+                if ":" in meta_propertyTitle:
+                    meta_origin, meta_feature = meta_propertyTitle.split(":")
+                    if meta_origin not in metadata['properties']:
+                        metadata['properties'][meta_origin] = {}
+
+                    metadata['properties'][meta_origin][meta_feature] = meta.attrs.get("content", "")
 
         return metadata
 
@@ -82,6 +122,10 @@ class GooseExtractor(HTMLExtractor):
     def extract(self, url=None, raw_html=None, default_lang='es'):
         """
         Code by Mike Ogren CACI Inc.,
+        Code to extract content and meta_tags by fetching URL or from HTML string
+        url: URL to fetch , takes precedence when raw_html argument is also present
+        raw_html: HTML string to parse
+        default_lang: 'es', language to use by default (config required by Goose)
         """
         if url:
             msg = super(GooseExtractor, self).extract(url)
@@ -120,7 +164,8 @@ class GooseExtractor(HTMLExtractor):
             if not content_lang:
                 content_lang = default_lang
             msg['url_language'] = content_lang
-            raw_html = raw_html.decode(msg['encoding'])
+            raw_html = decode(raw_html, msg['encoding'])
+            msg['metadata'] = self.get_metadata(raw_html)
         else:
             raise NotImplementedError
 
