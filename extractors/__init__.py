@@ -105,8 +105,9 @@ class HTMLExtractor(BaseExtractor):
                 metadata['features'][meta[meta_type]] = meta.attrs.get('content', '')
 
                 meta_propertyTitle = meta[meta_type]
-                if ":" in meta_propertyTitle:
-                    meta_origin, meta_feature = meta_propertyTitle.split(":")
+                meta_split_info = meta_propertyTitle.split(":", 1)
+                if len(meta_split_info) == 2:
+                    meta_origin, meta_feature = meta_split_info
                     if meta_origin not in metadata['properties']:
                         metadata['properties'][meta_origin] = {}
 
@@ -235,4 +236,7 @@ class URLMiner(object):
 
 
 def urlextract(url, extractor):
-    return extractor().extract(url=url)
+    try:
+        return extractor().extract(url=url)
+    except:
+        return {}
