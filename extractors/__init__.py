@@ -119,7 +119,11 @@ class HTMLExtractor(BaseExtractor):
 class GooseExtractor(HTMLExtractor):
     def __init__(self, **goose_config):
         if goose_config:
-        self.extractor = Goose(goose_config)
+            self.extractor = Goose(**goose_config)
+        else:
+            self.extractor = Goose()
+
+        self.goose_config = goose_config.get('config', {}) if goose_config else {}
 
     def extract(self, url=None, raw_html=None, default_lang='es'):
         """
@@ -175,6 +179,7 @@ class GooseExtractor(HTMLExtractor):
             'use_meta_language': False,
             'target_language': content_lang
         }
+        goose_config.update(self.goose_config)
 
         #Special Goose requirements for Arabic, Chinese and some more special languages
         if content_lang == "ar":
@@ -183,8 +188,8 @@ class GooseExtractor(HTMLExtractor):
             goose_config['stop_words_class'] = StopWordsChinese
         elif content_lang == 'ko':
             goose_config['stop_words_class'] = StopWordsKorean
-
-        goose_article = Goose(goose_config).extract(raw_html=raw_html)
+        
+        goose_article = Goose(config=goose_config).extract(raw_html=raw_html)
         msg["content"] = goose_article.cleaned_text if goose_article else None
         return msg
 
@@ -224,7 +229,7 @@ class URLMiner(object):
             urllist = [urllist]
             unwrap = True
 
-        url_content = Parallel(n_jobs=self.n_jobs, backend='threading')(delayed(urlextract)(((url[urltag] if urltag else url)), self.extractor, extractor_config) for url in urllist)
+        url_content = Parallel(n_jobs=self.n_jobs, backend='threading')(delayed(urlextract)(((url[urltag] if urltag else url)), self.extractor, **extractor_config) for url in urllist)
         if urltag:
             for index, l in enumerate(url_content):
                 urllist[index][urlContentKey] = l
@@ -239,7 +244,7 @@ class URLMiner(object):
 def urlextract(url, extractor, **extractor_config):
     try:
         if extractor_config:
-            return extractor(extractor_config).extract(url=url)
+            return extractor(**extractor_config).extract(url=url)
         else:
             return extractor().extract(url=url)
     except:
