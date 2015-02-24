@@ -217,13 +217,13 @@ class URLMiner(object):
 
         self.n_jobs = n_jobs
 
-    def extract(self, urllist, urltag=None, urlContentKey='urlcontent'):
+    def extract(self, urllist, urltag=None, urlContentKey='urlcontent', **extractor_config):
         unwrap = False
         if isinstance(urllist, basestring):
             urllist = [urllist]
             unwrap = True
 
-        url_content = Parallel(n_jobs=self.n_jobs, backend='threading')(delayed(urlextract)(((url[urltag] if urltag else url)), self.extractor) for url in urllist)
+        url_content = Parallel(n_jobs=self.n_jobs, backend='threading')(delayed(urlextract)(((url[urltag] if urltag else url)), self.extractor, extractor_config) for url in urllist)
         if urltag:
             for index, l in enumerate(url_content):
                 urllist[index][urlContentKey] = l
@@ -235,8 +235,11 @@ class URLMiner(object):
         return url_content
 
 
-def urlextract(url, extractor):
+def urlextract(url, extractor, **extractor_config):
     try:
-        return extractor().extract(url=url)
+        if extractor_config:
+            return extractor(extractor_config).extract(url=url)
+        else:
+            return extractor().extract(url=url)
     except:
         return {}
