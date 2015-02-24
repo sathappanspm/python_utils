@@ -199,7 +199,7 @@ class GooseExtractor(HTMLExtractor):
             lang = article.meta_lang
 
             if lang is None or lang == "en":
-                lang = detect_lang(resp)
+                lang = detect_lang(BeautifulSoup(resp).getText())
 
             if lang == "sp":
                 lang = "es"
