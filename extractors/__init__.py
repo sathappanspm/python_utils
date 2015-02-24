@@ -117,8 +117,9 @@ class HTMLExtractor(BaseExtractor):
 
 
 class GooseExtractor(HTMLExtractor):
-    def __init__(self):
-        self.extractor = Goose()
+    def __init__(self, **goose_config):
+        if goose_config:
+        self.extractor = Goose(goose_config)
 
     def extract(self, url=None, raw_html=None, default_lang='es'):
         """
