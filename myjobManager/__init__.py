@@ -29,6 +29,9 @@ class jsonWriter(ResultsWriter):
         self.handler = open(outfile, "w")
         self.sep = sep
 
+    def __enter__(self):
+        return self
+    
     def write(self, data):
         self.handler.write(json.dumps(data, ensure_ascii=False).encode("utf-8") + self.sep)
 
