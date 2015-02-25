@@ -241,11 +241,11 @@ class URLMiner(object):
         return url_content
 
 
-def urlextract(url, extractor, **extractor_config):
+def urlextract(url, extractor=HTMLExtractor, **extractor_config):
     try:
         if extractor_config:
             return extractor(**extractor_config).extract(url=url)
         else:
             return extractor().extract(url=url)
-    except:
-        return {}
+    except Exception, e:
+        return {'error': str(e)}
