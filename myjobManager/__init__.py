@@ -38,7 +38,7 @@ class jsonWriter(ResultsWriter):
     def close(self):
         self.handler.close()
 
-    def __exit__(self):
+    def __exit__(self, typ, value, traceback):
         self.close()
 
 
