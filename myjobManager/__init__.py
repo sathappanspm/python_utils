@@ -12,6 +12,7 @@ __version__ = "0.0.1"
 
 import threading
 import Queue
+import json
 
 
 class ResultsWriter(object):
@@ -24,12 +25,18 @@ class ResultsWriter(object):
 
 
 class jsonWriter(ResultsWriter):
-    def __init__(self, write_handler, sep="\n"):
-        self.handler = write_handler
+    def __init__(self, outfile, sep="\n"):
+        self.handler = open(outfile, "w")
         self.sep = sep
 
     def write(self, data):
         self.handler.write(json.dumps(data, ensure_ascii=False).encode("utf-8") + self.sep)
+
+    def close(self):
+        self.handler.close()
+
+    def __exit__(self):
+        self.close()
 
 
 class Processor(threading.Thread):
