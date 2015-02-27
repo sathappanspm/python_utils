@@ -15,6 +15,13 @@ import Queue
 import json
 
 
+def encode(s, encoding="utf-8"):
+    try:
+        return s.encode(encoding)
+    except:
+        return s
+
+
 class ResultsWriter(object):
     def __init__(self):
         self.res = []
@@ -33,7 +40,10 @@ class jsonWriter(ResultsWriter):
         return self
     
     def write(self, data):
-        self.handler.write(json.dumps(data, ensure_ascii=False).encode("utf-8") + self.sep)
+        try:
+            self.handler.write(encode(json.dumps(data, ensure_ascii=False)) + self.sep)
+        except:
+            self.handler.write(json.dumps(data) + self.sep)
 
     def close(self):
         self.handler.close()

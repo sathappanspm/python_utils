@@ -25,7 +25,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger(name='requests').setLevel(level=logging.WARNING)
-log = logging.getLogger()
+log = logging.getLogger(name=__name__)
 
 def decode(s, encoding=None):
     """
