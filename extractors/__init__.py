@@ -135,6 +135,7 @@ class HTMLExtractor(BaseExtractor):
         self.headers = {'User-agent': 'Goose/%s' % goose.__version__}
 
     def extract(self, url):
+        url = url.strip()
         if not urlparse(url).scheme:
             url = "http://" + url
         resp = requests.get(url, timeout=50, headers=self.headers)
