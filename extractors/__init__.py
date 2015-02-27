@@ -20,7 +20,12 @@ from goose.text import StopWordsKorean
 import sys
 from bs4 import UnicodeDammit, BeautifulSoup
 from urlparse import urlparse
+import re
+import logging
 
+logging.basicConfig(level=logging.INFO)
+logging.getLogger(name='requests').setLevel(level=logging.WARNING)
+log = logging.getLogger()
 
 def decode(s, encoding=None):
     """
@@ -55,10 +60,78 @@ class BaseExtractor(object):
         pass
 
 
+class BaseEnricher(object):
+    def __init__(self, article, soup_parser):
+        self.article = article
+        if article.top_node:
+            top_node_attrs = dict([i for i in self.top_node.items() if i[0] not in ('gravityScore', 'gravityNodes')])
+            self.parser = soup_parser.find(self.top_node.tag, attrs=top_node_attrs)
+        else:
+            self.parser = soup_parser
+    
+    def extract(self):
+        pass
+
+
+class LinkEnricher(BaseEnricher):
+    def extract(self):
+        links = {}
+        for l in self.parser.findAll('a', href=True):
+            links[l.attrs['href']] = l.text
+
+        return links
+
+
+class TweetInfoEnricher(BaseEnricher):
+    def __init__(self, article, soup_parser):
+        super(TweetInfoEnricher, self).__init__(article, soup_parser)
+        self.hashtagre = re.compile(r'#[^\s]*\b', re.U|re.I)
+        self.userre = re.compile(r'@[^\s]*\b', re.I|re.U)
+
+    def extract(self):
+        tweet_blocks = self._extract_tweets()
+        hashtags_users = self._extract_user_hashtags()
+        if tweet_blocks or hashtags_users:
+            res = {'tweets': tweet_blocks}
+            res.update(hashtags_users)
+            return res
+        return {}
+
+    def _extract_tweets(self):
+        blocks = self.parser.findAll('blockquote')
+        tweets = []
+        for b in blocks:
+            bclass = " ".join(b.attrs['class'])
+            if "tweet" in bclass or 'twitter' in bclass:
+                msg = {'html_block': b.__str__()}
+                tweet_links = []
+                if "cite" in b.attrs:
+                    tweet_links += b.attrs['cite']
+
+                if 'data-tweet-id' in b.attrs:
+                    msg['tweet-id'] = b.attr['data-tweet-id']
+
+                tweet_links += [mention.attrs['href'] for mention in b.findAll('a')
+                    if '/status' in mention.attrs.get('href', '')]
+                msg['tweet-link'] = list(set(tweet_links))
+                tweets.append(msg)
+        return tweets
+
+    def _extract_user_hashtags(self):
+        ht = self.hashtagre.findall(self.article.cleaned_text)
+        user = self.userre.findall(self.article.cleaned_text)
+        if ht or user:
+            return {'users': user, 'hashtags': ht}
+        return {}
+
+
 class HTMLExtractor(BaseExtractor):
     """
     Extracts
     """
+    def __init__(self):
+        self.soup_parser = None
+
     def extract(self, url):
         if not urlparse(url).scheme:
             url = "http://" + url
@@ -74,7 +147,6 @@ class HTMLExtractor(BaseExtractor):
             }
 
             return msg
-
         return {'error': resp.status_code}
 
     def contentFix(self, resp):
@@ -87,7 +159,7 @@ class HTMLExtractor(BaseExtractor):
         except Exception, e:
             raise Exception('Error Fixing Content (%s): %s' % (str(e), resp.url))
 
-    def get_metadata(self, raw_html):
+    def get_metadata(self, raw_html=None):
         """
         Get Meta-data from given HTML text.
         Split them based on the origin of meta (like - 'og', 'twitter', 'dc', etc.)
@@ -97,9 +169,9 @@ class HTMLExtractor(BaseExtractor):
         return:
             metadata : Dict of form  {'features': {}, 'properties': {} }
         """
-        soup = BeautifulSoup(raw_html)
+        self.soup_parser = BeautifulSoup(raw_html)
         metadata = {"features": {}, "properties": {}}
-        for meta in soup.find_all('meta'):
+        for meta in self.soup_parser.find_all('meta'):
             meta_type = 'name' if 'name' in meta.attrs else ('property' if 'property' in meta.attrs else "")
             if meta_type:
                 metadata['features'][meta[meta_type]] = meta.attrs.get('content', '')
@@ -124,8 +196,9 @@ class GooseExtractor(HTMLExtractor):
             self.extractor = Goose()
 
         self.goose_config = goose_config.get('config', {}) if goose_config else {}
+        self.article = None
 
-    def extract(self, url=None, raw_html=None, default_lang='es'):
+    def extract(self, url=None, raw_html=None, default_lang='es', cleanse=False):
         """
         Code by Mike Ogren CACI Inc.,
         Code to extract content and meta_tags by fetching URL or from HTML string
@@ -166,6 +239,7 @@ class GooseExtractor(HTMLExtractor):
                 'headers': '',
                 'link': ''
             }
+            self.soup_parser = BeautifulSoup(raw_html)
             content_lang = self.guess_language(raw_html)
             if not content_lang:
                 content_lang = default_lang
@@ -188,9 +262,13 @@ class GooseExtractor(HTMLExtractor):
             goose_config['stop_words_class'] = StopWordsChinese
         elif content_lang == 'ko':
             goose_config['stop_words_class'] = StopWordsKorean
-        
-        goose_article = Goose(config=goose_config).extract(raw_html=raw_html)
-        msg["content"] = goose_article.cleaned_text if goose_article else None
+ 
+        self.article = Goose(config=goose_config).extract(raw_html=raw_html)
+        if cleanse:
+            msg["content"] = self.cleanse() if self.article else None
+        else:
+            msg["content"] = self.article.cleaned_text if self.article else None
+        msg['raw_html'] = raw_html
         return msg
 
     def guess_language(self, resp):
@@ -199,16 +277,30 @@ class GooseExtractor(HTMLExtractor):
             lang = article.meta_lang
 
             if lang is None or lang == "en":
-                lang = detect_lang(BeautifulSoup(resp).getText())
+                lang = detect_lang(self.soup_parser.getText())
 
-            if lang == "sp":
+            if lang in ("sp", "ca"):
                 lang = "es"
 
             return lang
         except KeyError, e:
-            sys.stderr.write("Error detecting language %s" % str(e))
+            log.error("Error detecting language %s" % str(e))
             return None
+    
+    def cleanse(self):
+        cleansed_text = self.article.cleaned_text
+        if cleansed_text:
+            for p in reversed(cleansed_text.split("\n")):
+                if len(p.split()) < 10:
+                    if not p.strip():
+                        continue
 
+                    replace_str = p
+                    log.info("removed '%s' from text" % replace_str)
+                    cleansed_text = cleansed_text.replace(replace_str, "")
+                else:
+                    break
+        return cleansed_text
 
 class URLMiner(object):
     def __init__(self, n_jobs=-1, extract_content=None, **kwargs):
