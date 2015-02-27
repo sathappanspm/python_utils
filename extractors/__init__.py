@@ -12,6 +12,7 @@ __version__ = "0.0.1"
 
 from joblib import Parallel, delayed
 import requests
+import goose
 from goose import Goose
 from langdetect import detect as detect_lang
 from goose.text import StopWordsArabic
@@ -131,11 +132,12 @@ class HTMLExtractor(BaseExtractor):
     """
     def __init__(self):
         self.soup_parser = None
+        self.headers = {'User-agent': 'Goose/%s' % goose.__version__}
 
     def extract(self, url):
         if not urlparse(url).scheme:
             url = "http://" + url
-        resp = requests.get(url, timeout=50)
+        resp = requests.get(url, timeout=50, headers=self.headers)
         if resp.status_code == 200:
             resp = self.contentFix(resp)
             msg = {
