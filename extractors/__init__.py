@@ -64,7 +64,7 @@ class BaseEnricher(object):
     def __init__(self, article, soup_parser):
         self.article = article
         if article.top_node:
-            top_node_attrs = dict([i for i in self.top_node.items() if i[0] not in ('gravityScore', 'gravityNodes')])
+            top_node_attrs = dict([i for i in article.top_node.items() if i[0] not in ('gravityScore', 'gravityNodes')])
             self.parser = soup_parser.find(self.top_node.tag, attrs=top_node_attrs)
         else:
             self.parser = soup_parser
