@@ -200,6 +200,7 @@ class GooseExtractor(HTMLExtractor):
 
         self.goose_config = goose_config.get('config', {}) if goose_config else {}
         self.article = None
+        super(GooseExtractor, self).__init__()
 
     def extract(self, url=None, raw_html=None, default_lang='es', cleanse=False):
         """
