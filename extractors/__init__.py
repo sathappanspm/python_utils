@@ -102,7 +102,7 @@ class TweetInfoEnricher(BaseEnricher):
         blocks = self.parser.findAll('blockquote')
         tweets = []
         for b in blocks:
-            bclass = " ".join(b.attrs['class'])
+            bclass = " ".join(b.attrs.get('class', ''))
             if "tweet" in bclass or 'twitter' in bclass:
                 msg = {'html_block': b.__str__()}
                 tweet_links = []
@@ -212,6 +212,9 @@ class GooseExtractor(HTMLExtractor):
         """
         if url:
             msg = super(GooseExtractor, self).extract(url)
+            if "content" in msg and (msg["content"] == "" or msg["content"] is None):
+                msg = super(GooseExtractor, self).extract(url)
+            
             if not 'error' in msg:
                 content_lang = self.guess_language(msg["content"])
                 if not content_lang:
@@ -277,6 +280,8 @@ class GooseExtractor(HTMLExtractor):
 
     def guess_language(self, resp):
         try:
+            if not resp:
+                return None
             article = self.extractor.extract(raw_html=resp)
             lang = article.meta_lang
 
@@ -287,7 +292,7 @@ class GooseExtractor(HTMLExtractor):
                 lang = "es"
 
             return lang
-        except KeyError, e:
+        except (KeyError, TypeError), e:
             log.error("Error detecting language %s" % str(e))
             return None
     
