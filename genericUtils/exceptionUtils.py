@@ -10,7 +10,7 @@ __author__ = "Sathappan Muthiah"
 __email__ = "sathap1@vt.edu"
 __version__ = "0.0.1"
 
-from functool import wraps
+from functools import wraps
 import signal
 import os
 import errno
@@ -26,10 +26,10 @@ def timeout(seconds=10, errormsg=os.strerror(errno.ETIME)):
 
     """
     def decorator(func):
-        def _timeoutHandler(errormsg):
-            return TimeOutError(errormsg)
+        def _timeoutHandler(signum, errormsg):
+            raise TimeOutError(errormsg)
 
-        @wraps
+        @wraps(func)
         def wrapper(*args, **kwargs):
             signal.signal(signal.SIGALRM, _timeoutHandler)
             signal.alarm(seconds)
