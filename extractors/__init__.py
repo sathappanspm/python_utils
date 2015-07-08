@@ -253,6 +253,8 @@ class GooseExtractor(HTMLExtractor):
             msg['url_language'] = content_lang
             raw_html = decode(raw_html, msg['encoding'])
             msg['metadata'] = self.get_metadata(raw_html)
+            msg['tweetInfo'] = TweetInfoEnricher(self.article, self.soup_parser).extract()
+            msg['linkEnrichment'] = LinkEnricher(self.article, self.soup_parser).extract()
         else:
             raise NotImplementedError
 
@@ -271,6 +273,8 @@ class GooseExtractor(HTMLExtractor):
             goose_config['stop_words_class'] = StopWordsKorean
  
         self.article = Goose(config=goose_config).extract(raw_html=raw_html)
+        msg["title"] = self.article.title
+        msg["description"] = self.article.meta_description
         if cleanse:
             msg["content"] = self.cleanse() if self.article else None
         else:
