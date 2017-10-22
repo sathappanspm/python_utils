@@ -19,12 +19,15 @@ def make_closing(base, **attrs):
 
 
 # code from smart_open package https://github.com/piskvorky/smart_open
-def smart_open(fname, mode='rb'):
+def smart_open(fname, mode='rb', force_ext=None):
     """
     Stream from/to local filesystem, transparently (de)compressing gzip and bz2
     files if necessary.
     """
     _, ext = os.path.splitext(fname)
+
+    if force_ext:
+        ext = force_ext
 
     if ext == '.bz2':
         PY2 = sys.version_info[0] == 2
